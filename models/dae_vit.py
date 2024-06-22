@@ -17,6 +17,7 @@ import torch
 import torch.nn as nn
 
 from utils import RayleighChannel
+from utils.utils import RicianChannel
 
 from .decoder import ViTDecoder
 from .encoder import ViTEncoder
@@ -89,7 +90,7 @@ class DAEViT(nn.Module):
             gate,
         )
 
-        self.rayleigh = RayleighChannel(noise_factor)
+        self.ricean = RicianChannel(noise_factor)
 
     def forward(self, img):
         """
@@ -102,7 +103,7 @@ class DAEViT(nn.Module):
             torch.Tensor: Predicted image after the forward pass.
         """
         features = self.encoder(img)
-        noisy_features = self.rayleigh(features)
+        noisy_features = self.ricean(features)
         predicted_img = self.decoder(noisy_features)
 
         return predicted_img
