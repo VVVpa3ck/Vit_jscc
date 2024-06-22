@@ -115,15 +115,16 @@ class RicianChannel(nn.Module):
         sigma (float): a scaling factor for the noise added to the input.
     """
 
-    def __init__(self, K, sigma):
+    def __init__(self, sigma):
         """Constructs all the necessary attributes for the Rician Channel object.
 
         Args:
             K (float): Rician factor.
             sigma (float): a scaling factor for the noise added to the input.
         """
+        
         super().__init__()
-        self.K = K
+        self.K = 2
         self.sigma = sigma
 
     def forward(self, x):
