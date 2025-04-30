@@ -10,7 +10,8 @@ from typing import Tuple
 import lightning as pl
 import torch
 import torchmetrics.image as im_metrics
-
+from attack import add_noise_with_snr
+from reg_attack import FastGradientSignUntargeted
 
 class LitDAE(pl.LightningModule):
     """
@@ -39,6 +40,20 @@ class LitDAE(pl.LightningModule):
         self.ssim = im_metrics.StructuralSimilarityIndexMeasure()
         self.psnr = im_metrics.PeakSignalNoiseRatio()
 
+        self.epsilon = cfg.get("fgsm_epsilon", 0.1)
+        self.attack = cfg.get("fgsm", False)
+        self.train_snr_db = cfg.get("snr", None)
+
+        self.pgd = FastGradientSignUntargeted(
+            model=self.model,
+            epsilon=self.cfg.get("fgsm_epsilon", 0.1),
+            alpha=self.cfg.get("pgd_alpha", 0.01),
+            min_val=0.0,
+            max_val=1.0,
+            max_iters=self.cfg.get("pgd_iters", 5),
+            _type='linf'
+        )
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Forward pass.
@@ -65,10 +80,23 @@ class LitDAE(pl.LightningModule):
             torch.Tensor: Loss tensor.
         """
         _, img = batch
+
+
+        if self.train_snr_db is not None:
+            img = add_noise_with_snr(img, self.train_snr_db)
+
+        if self.attack:
+            print("")
+            img = self.pgd.perturb(
+                original_images=img,
+                labels=None,
+                reduction4loss='mean',
+                random_start=False
+            )
+
         r_img = self.model(img)
         loss = self.loss(r_img, img)
         self.log("train_loss", loss, prog_bar=True)
-
         return loss
 
     def validation_step(
@@ -112,16 +140,36 @@ class LitDAE(pl.LightningModule):
             torch.Tensor: Loss tensor.
         """
         _, img = batch
-        r_img = self.model(img)
+        # r_img = self.model(img)
 
         # denoising autoencoder metrics
-        loss = self.loss(r_img, img)
-        ssim = self.ssim(r_img, img)
-        psnr = self.psnr(r_img, img)
+        # loss = self.loss(r_img, img)
+        # ssim = self.ssim(r_img, img)
+        # psnr = self.psnr(r_img, img)
 
-        self.log("test_loss", loss, sync_dist=True, prog_bar=True)
-        self.log("test_ssim", ssim, sync_dist=True, prog_bar=True)
-        self.log("test_psnr", psnr, sync_dist=True, prog_bar=True)
+        # self.log("test_loss", loss, sync_dist=True, prog_bar=True)
+        # self.log("test_ssim", ssim, sync_dist=True, prog_bar=True)
+        # self.log("test_psnr", psnr, sync_dist=True, prog_bar=True)
+        for snr_db in range(0, 31, 5):  # 测试 SNR 从 0 到 30 每隔 5dB
+            noisy_img = self.add_noise_with_snr(img, snr_db)
+            r_img = self.model(noisy_img)
+
+            loss = self.loss(r_img, img)
+            ssim = self.ssim(r_img, img)
+            psnr = self.psnr(r_img, img)
+
+            self.log(f"test_loss_snr{snr_db}", loss, sync_dist=True)
+            self.log(f"test_ssim_snr{snr_db}", ssim, sync_dist=True)
+            self.log(f"test_psnr_snr{snr_db}", psnr, sync_dist=True)
+
+
+    @staticmethod
+    def add_noise_with_snr(x, snr_db):
+        signal_power = x.pow(2).mean()
+        snr = 10 ** (snr_db / 10)
+        noise_power = signal_power / snr
+        noise = torch.randn_like(x) * torch.sqrt(noise_power)
+        return torch.clamp(x + noise, 0, 1)
 
     def configure_optimizers(self) -> Tuple[list, list]:
         """
@@ -131,3 +179,5 @@ class LitDAE(pl.LightningModule):
             Tuple[list, list]: Optimizers and schedulers.
         """
         return {"optimizer": self.optimizer, "lr_scheduler": self.lr_scheduler}
+
+

@@ -136,13 +136,55 @@ class RicianChannel(nn.Module):
         Returns:
             torch.Tensor: output tensor after adding Rician noise.
         """
+
+        device = x.device
+        dtype = x.dtype
         # Generate the direct path component (LOS)
-        s = torch.sqrt(self.K / (1 + self.K)) * torch.ones_like(x)
+        # s = torch.sqrt(self.K / (1 + self.K)) * torch.ones_like(x)
+        # s = torch.sqrt(torch.tensor(self.K / (1 + self.K), device=x.device, dtype=x.dtype)) * torch.ones_like(x)
         
+        # # Generate the scattered path component (NLOS)
+        # noise = torch.randn_like(x) + 1j * torch.randn_like(x)
+        
+        # # Combine both components and add to input
+        # rician_noise = s + torch.sqrt(1 / (1 + self.K)) * noise
+        
+        # return x + self.sigma * torch.abs(rician_noise)
+
+        K_tensor = torch.tensor(self.K / (1 + self.K), device=device, dtype=dtype)
+        s = torch.sqrt(K_tensor) * torch.ones_like(x)
+
         # Generate the scattered path component (NLOS)
         noise = torch.randn_like(x) + 1j * torch.randn_like(x)
-        
+
         # Combine both components and add to input
-        rician_noise = s + torch.sqrt(1 / (1 + self.K)) * noise
-        
+        fading_ratio = torch.tensor(1 / (1 + self.K), device=device, dtype=dtype)
+        rician_noise = s + torch.sqrt(fading_ratio) * noise
+
         return x + self.sigma * torch.abs(rician_noise)
+    
+
+class ChannelModel(nn.Module):
+    def __init__(self, mode='rayleigh', snr_db=25):
+        super().__init__()
+        self.mode = mode
+        self.snr_db = snr_db
+
+    def forward(self, x):
+        if self.mode == 'awgn':
+            return self._awgn(x)
+        elif self.mode == 'rayleigh':
+            return self._rayleigh(x)
+        else:
+            return x  # no channel
+
+    def _awgn(self, x):
+        power = x.pow(2).mean()
+        snr = 10 ** (self.snr_db / 10)
+        noise_power = power / snr
+        noise = torch.randn_like(x) * torch.sqrt(noise_power)
+        return x + noise
+
+    def _rayleigh(self, x):
+        fading = torch.randn_like(x) * (1.0 / 2**0.5)
+        return self._awgn(x * fading)

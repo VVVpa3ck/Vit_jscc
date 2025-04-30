@@ -52,6 +52,7 @@ class DAEViT(nn.Module):
         decoder_head=16,
         gate=nn.Sigmoid,
         noise_factor=0.2,
+        channel=None,
     ) -> None:
         """
         Initializes the DAEViT model with the given parameters.
@@ -90,7 +91,8 @@ class DAEViT(nn.Module):
             gate,
         )
 
-        self.rayleigh = RayleighChannel(noise_factor)
+        # self.rayleigh = RayleighChannel(noise_factor)
+        self.channel = channel if channel is not None else nn.Identity()
 
     def forward(self, img):
         """
@@ -103,7 +105,7 @@ class DAEViT(nn.Module):
             torch.Tensor: Predicted image after the forward pass.
         """
         features = self.encoder(img)
-        noisy_features = self.rayleigh(features)
+        noisy_features = self.channel(features)
         predicted_img = self.decoder(noisy_features)
 
         return predicted_img

@@ -25,6 +25,7 @@ from config import get_cfg, get_defaults
 from data import *
 from models import DAEViT, LitDAE, dae_vit_models
 from utils import EMACallback, SimplifiedProgressBar
+from utils import ChannelModel, RayleighChannel, RicianChannel
 
 # Common setup
 warnings.filterwarnings("ignore")
@@ -66,6 +67,15 @@ def train(
                 "red",
             )
         )
+    
+    if cfg.channel == "awgn":
+        channel = ChannelModel(mode="awgn", snr_db=cfg.snr)
+    elif cfg.channel == "rayleigh":
+        channel = RayleighChannel(cfg.noise_factor)
+    elif cfg.channel == "rician":
+        channel = RicianChannel(cfg.noise_factor)
+    else:  # 默认 no channel
+        channel = nn.Identity()
 
     # Get the model
     model = DAEViT(
@@ -79,6 +89,7 @@ def train(
         decoder_head=cfg.decoder_head,
         gate=gate,
         noise_factor=cfg.noise_factor,
+        channel=channel
     )
 
     # Training setup
@@ -305,6 +316,34 @@ if __name__ == "__main__":
         default=cfg.val_freq,
         help="Validate every n epochs",
     )
+
+    parser.add_argument(
+        "--fgsm", 
+        action="store_true", 
+        help="Apply FGSM adversarial attack"
+    )
+    
+    parser.add_argument(
+        "--fgsm-epsilon", 
+        type=float, 
+        default=0.1, 
+        help="FGSM epsilon value"
+    )
+
+    parser.add_argument(
+        "--snr", 
+        type=float, 
+        default=25.0,
+        help="SNR value in dB to add Gaussian noise during training (optional)"
+    )
+
+    parser.add_argument(
+        "--channel", 
+        type=str,
+        default="rayleigh", 
+        help="Channel model: 'awgn', 'rayleigh', 'rician', or 'none'"
+    )
+
     args = parser.parse_args()
 
     if args.devices != "auto":
@@ -346,7 +385,7 @@ if __name__ == "__main__":
                 "red",
             )
         )
-
+    
     cfg.update(args.__dict__)
 
     upd_cfg = get_cfg(
