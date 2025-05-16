@@ -23,7 +23,7 @@ from torchmetrics import MeanSquaredError
 
 from config import get_cfg, get_defaults
 from data import *
-from models import DAEViT, LitDAE, dae_vit_models
+from models import DAEViT, LitDAE, dae_vit_models, DeepSCRI
 from utils import EMACallback, SimplifiedProgressBar
 from utils import ChannelModel, RayleighChannel, RicianChannel
 

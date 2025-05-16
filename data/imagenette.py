@@ -69,15 +69,23 @@ class Imagenette(Dataset):
         elif self.mode == "test":
             self.imgs = self._get_img_paths(os.path.join(self.root, "test"))
 
-    def _get_img_paths(self, root):
-        """
-        Get image paths.
-        """
-        img_paths = []
-        for img_name in os.listdir(root):
-            img_path = os.path.join(root, img_name)
-            img_paths.append(img_path)
+    # def _get_img_paths(self, root):
+    #     """
+    #     Get image paths.
+    #     """
+    #     img_paths = []
+    #     for img_name in os.listdir(root):
+    #         img_path = os.path.join(root, img_name)
+    #         img_paths.append(img_path)
 
+    #     return img_paths
+
+    def _get_img_paths(self, root):
+        img_paths = []
+        for dirpath, _, filenames in os.walk(root):
+            for fname in filenames:
+                if fname.lower().endswith((".jpg", ".jpeg", ".png", ".bmp")):
+                    img_paths.append(os.path.join(dirpath, fname))
         return img_paths
 
 

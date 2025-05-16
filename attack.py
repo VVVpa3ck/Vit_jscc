@@ -1,13 +1,30 @@
 import torch
+import torch.nn.functional as F
 
-def fgsm_attack(model, loss_fn, images, labels, epsilon):
+
+def fgsm_attack(model, images, epsilon):
+    """
+    FGSM for image reconstruction models (e.g., DAEViT).
+
+    Args:
+        model: reconstruction model
+        images: (B, C, H, W) input
+        epsilon: perturbation strength
+
+    Returns:
+        perturbed images
+    """
+    images = images.clone().detach().to(images.device)
     images.requires_grad = True
+
     outputs = model(images)
-    loss = loss_fn(outputs, images)
+    loss = F.mse_loss(outputs, images)
     model.zero_grad()
     loss.backward()
-    perturbed_images = images + epsilon * images.grad.sign()
-    return torch.clamp(perturbed_images, 0, 1)
+
+    perturbed = images + epsilon * images.grad.sign()
+    perturbed = torch.clamp(perturbed, 0, 1)
+    return perturbed
 
 
 def add_noise_with_snr(x: torch.Tensor, snr_db: float) -> torch.Tensor:

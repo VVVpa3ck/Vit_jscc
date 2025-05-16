@@ -56,6 +56,7 @@ class ViTEncoder(nn.Module):
         self.transformer = nn.Sequential(
             *[Block(emb_dim, num_head) for _ in range(num_layer)]
         )
+        
 
         self.layer_norm = nn.LayerNorm(emb_dim)
 

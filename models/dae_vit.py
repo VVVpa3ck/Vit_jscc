@@ -81,6 +81,8 @@ class DAEViT(nn.Module):
             encoder_layer,
             encoder_head,
         )
+
+
         self.decoder = ViTDecoder(
             in_channels,
             img_size,
@@ -183,3 +185,6 @@ dae_vit_models = {
     "dae_vit_large": dae_vit_large_patch16_224,
     "dae_vit_huge": dae_vit_huge_patch16_224,
 }
+
+
+deepsc_ri_models = ["deep_sc_ri"]

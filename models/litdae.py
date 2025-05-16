@@ -10,8 +10,9 @@ from typing import Tuple
 import lightning as pl
 import torch
 import torchmetrics.image as im_metrics
-from attack import add_noise_with_snr
-from reg_attack import FastGradientSignUntargeted
+from attack import add_noise_with_snr, fgsm_attack
+
+
 
 class LitDAE(pl.LightningModule):
     """
@@ -40,19 +41,19 @@ class LitDAE(pl.LightningModule):
         self.ssim = im_metrics.StructuralSimilarityIndexMeasure()
         self.psnr = im_metrics.PeakSignalNoiseRatio()
 
-        self.epsilon = cfg.get("fgsm_epsilon", 0.1)
+        self.epsilon = cfg.fgsm_epsilon if hasattr(cfg, "fgsm_epsilon") else 0.1
         self.attack = cfg.get("fgsm", False)
         self.train_snr_db = cfg.get("snr", None)
 
-        self.pgd = FastGradientSignUntargeted(
-            model=self.model,
-            epsilon=self.cfg.get("fgsm_epsilon", 0.1),
-            alpha=self.cfg.get("pgd_alpha", 0.01),
-            min_val=0.0,
-            max_val=1.0,
-            max_iters=self.cfg.get("pgd_iters", 5),
-            _type='linf'
-        )
+        # self.pgd = FastGradientSignUntargeted(
+        #     model=self.model,
+        #     epsilon=self.cfg.get("fgsm_epsilon", 0.1),
+        #     alpha=self.cfg.get("pgd_alpha", 0.01),
+        #     min_val=0.0,
+        #     max_val=1.0,
+        #     max_iters=self.cfg.get("pgd_iters", 5),
+        #     _type='linf'
+        # )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -87,12 +88,7 @@ class LitDAE(pl.LightningModule):
 
         if self.attack:
             print("")
-            img = self.pgd.perturb(
-                original_images=img,
-                labels=None,
-                reduction4loss='mean',
-                random_start=False
-            )
+            img = fgsm_attack(self.model, img, epsilon=self.epsilon)
 
         r_img = self.model(img)
         loss = self.loss(r_img, img)
